@@ -1,34 +1,104 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { toneOptions, mockRoasts } from '../data/roastData.js'
+import spotifyService from '../services/spotifyService.js'
 
 const isConnected = ref(false)
 const isLoading = ref(false)
 const roastResult = ref('')
 const selectedTone = ref('leve')
+const userData = ref(null)
+const musicAnalysis = ref(null)
 
-// Dados simulados do usuário
-const userData = ref({
-  name: 'João Silva',
-  image: '/placeholder.svg?height=80&width=80'
+onMounted(() => {
+  // Verificar se já está autenticado
+  if (spotifyService.isAuthenticated()) {
+    loadUserData()
+  }
 })
 
-const connectSpotify = () => {
-  isLoading.value = true
-  setTimeout(() => {
+const loadUserData = async () => {
+  try {
+    isLoading.value = true
+    const data = await spotifyService.analyzeUserMusic()
+    userData.value = data.profile
+    musicAnalysis.value = data.analysis
     isConnected.value = true
+  } catch (error) {
+    console.error('Error loading user data:', error)
+    // Se der erro, fazer logout para limpar tokens inválidos
+    spotifyService.logout()
+    isConnected.value = false
+  } finally {
     isLoading.value = false
-  }, 2000)
+  }
 }
 
-const generateRoast = () => {
+const connectSpotify = () => {
+  // Redirecionar para autorização do Spotify
+  window.location.href = spotifyService.getAuthUrl()
+}
+
+const generateRoast = async () => {
+  if (!musicAnalysis.value) {
+    alert('Dados musicais ainda não carregados. Tente novamente.')
+    return
+  }
+
   isLoading.value = true
   roastResult.value = ''
   
-  setTimeout(() => {
-    roastResult.value = mockRoasts[selectedTone.value]
+  try {
+    // Simular processamento (você pode implementar lógica real de IA aqui)
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    
+    // Gerar roast baseado nos dados reais do usuário
+    roastResult.value = generatePersonalizedRoast(selectedTone.value, musicAnalysis.value)
+  } catch (error) {
+    console.error('Error generating roast:', error)
+    roastResult.value = mockRoasts[selectedTone.value] // Fallback para mock
+  } finally {
     isLoading.value = false
-  }, 3000)
+  }
+}
+
+const generatePersonalizedRoast = (tone, analysis) => {
+  const { topGenres, popularityScore, topArtists, topTracks } = analysis
+  
+  const templates = {
+    leve: [
+      `Seus top gêneros são ${topGenres.slice(0, 2).map(g => g.genre).join(' e ')}... pelo menos você tem consistência! 🎵`,
+      `Você ouve ${topArtists[0]?.name || 'artistas'} como se fosse seu trabalho. Que dedicação! 😄`,
+      `Score de popularidade: ${popularityScore.score}/100. ${popularityScore.category === 'Underground' ? 'Você é hipster mesmo!' : 'Mainstream, mas tudo bem!'} 🎯`
+    ],
+    
+    debochado: [
+      `Querido, ${popularityScore.category.toLowerCase()} é seu middle name. Você tem o gosto musical de quem só ouve rádio de elevador, mas com extra steps. 💅`,
+      `${topArtists[0]?.name || 'Seus artistas favoritos'} deve ter você como fã número 1... e talvez único. Que fofo! ✨`,
+      `${topGenres[0]?.genre || 'Seu gênero favorito'} é seu comfort zone há anos. Mudança é assustadora mesmo! 🎭`
+    ],
+    
+    quebrada: [
+      `Mano, ${popularityScore.score} de popularidade? Você tá ouvindo música ou fazendo curso de nicho cultural? 💥`,
+      `${topTracks[0]?.name || 'Suas músicas'} no repeat eterno. Varia o repertório, parceiro! 🎧`,
+      `${topGenres.slice(0, 2).map(g => g.genre).join(' e ')} é coisa de quem quer aparecer. Relaxa na pose! 🔥`
+    ],
+    
+    exposed: [
+      `Sua playlist grita '${popularityScore.category.toLowerCase()}' mais alto que suas inseguranças. Score ${popularityScore.score}/100 de quem tenta muito! 💔`,
+      `${topArtists[0]?.name || 'Seus artistas'} é sua terapia musical barata. Todo mundo vê que você tá processando algo! 🔥`,
+      `${topGenres[0]?.genre || 'Seus gêneros'} é seu mecanismo de defesa musical. Que transparente! 😱`
+    ],
+    
+    poetico: [
+      `Tuas frequências sonoras dançam entre ${topGenres.slice(0, 2).map(g => g.genre).join(' e ')}, como sussurros de uma alma que busca identidade nos algoritmos digitais. 🌈`,
+      `${topArtists[0]?.name || 'Teus artistas escolhidos'} ecoa(m) nos corredores da tua melancolia, com score ${popularityScore.score} de popularidade - números que não definem a profundidade do sentir. 🎭`,
+      `Tu habitas o universo ${popularityScore.category.toLowerCase()}, onde cada nota é uma lágrima cristalizada no tempo. Que belo! ✨`
+    ]
+  }
+  
+  const toneTemplates = templates[tone] || templates.leve
+  return toneTemplates[Math.floor(Math.random() * toneTemplates.length)]
 }
 
 const shareRoast = async () => {
@@ -41,9 +111,12 @@ const shareRoast = async () => {
 }
 
 const disconnect = () => {
+  spotifyService.logout()
   isConnected.value = false
   roastResult.value = ''
   selectedTone.value = 'leve'
+  userData.value = null
+  musicAnalysis.value = null
 }
 </script>
 
@@ -98,11 +171,19 @@ const disconnect = () => {
             <b-card class="user-info-card mb-4" body-class="p-3">
               <b-row class="align-items-center">
                 <b-col cols="auto">
-                  <b-avatar :src="userData.image" size="64" class="border border-success border-2"></b-avatar>
+                  <b-avatar 
+                    :src="userData.images?.[0]?.url || '/placeholder.svg?height=64&width=64'" 
+                    size="64" 
+                    class="border border-success border-2"
+                  ></b-avatar>
                 </b-col>
                 <b-col>
-                  <h5 class="text-white mb-1">{{ userData.name }}</h5>
-                  <p class="text-success mb-0 fw-medium">Conectado ao Spotify</p>
+                  <h5 class="text-white mb-1">{{ userData.display_name }}</h5>
+                  <p class="text-success mb-0 fw-medium">{{ userData.followers?.total || 0 }} seguidores</p>
+                  <small v-if="musicAnalysis" class="text-muted">
+                    {{ musicAnalysis.popularityScore?.category || 'Analisando...' }} | 
+                    Score: {{ musicAnalysis.popularityScore?.score || 0 }}/100
+                  </small>
                 </b-col>
                 <b-col cols="auto">
                   <b-button 

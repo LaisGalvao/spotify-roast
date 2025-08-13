@@ -1,10 +1,10 @@
 <script setup>
-import SpotifyRoast from './components/SpotifyRoast.vue'
+// O router-view irá renderizar o componente apropriado
 </script>
 
 <template>
   <div class="app-background">
-    <SpotifyRoast />
+    <router-view />
   </div>
 </template>
 
