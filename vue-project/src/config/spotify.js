@@ -10,7 +10,7 @@ export const SPOTIFY_CONFIG = {
     'user-top-read',
     'user-read-recently-played',
     'user-library-read'
-  ].join(' '),
+  ],
   AUTH_URL: 'https://accounts.spotify.com/authorize',
   API_BASE_URL: 'https://api.spotify.com/v1'
 }

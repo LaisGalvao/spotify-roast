@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { toneOptions, mockRoasts } from '../data/roastData.js'
+import { toneOptions } from '../data/roastData.js'
 import spotifyService from '../services/spotifyService.js'
+import aiRoastService from '../services/aiRoastService.js'
 
 const isConnected = ref(false)
 const isLoading = ref(false)
@@ -9,6 +10,7 @@ const roastResult = ref('')
 const selectedTone = ref('leve')
 const userData = ref(null)
 const musicAnalysis = ref(null)
+const isGeneratingRoast = ref(false)
 
 onMounted(() => {
   // Verificar se já está autenticado
@@ -34,9 +36,18 @@ const loadUserData = async () => {
   }
 }
 
-const connectSpotify = () => {
-  // Redirecionar para autorização do Spotify
-  window.location.href = spotifyService.getAuthUrl()
+const connectSpotify = async () => {
+  try {
+    isLoading.value = true
+    // Gerar URL de autorização com PKCE
+    const authUrl = await spotifyService.getAuthUrl()
+    window.location.href = authUrl
+  } catch (error) {
+    console.error('Error generating auth URL:', error)
+    alert('Erro ao conectar com Spotify. Tente novamente.')
+  } finally {
+    isLoading.value = false
+  }
 }
 
 const generateRoast = async () => {
@@ -45,20 +56,19 @@ const generateRoast = async () => {
     return
   }
 
-  isLoading.value = true
+  isGeneratingRoast.value = true
   roastResult.value = ''
   
   try {
-    // Simular processamento (você pode implementar lógica real de IA aqui)
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    
-    // Gerar roast baseado nos dados reais do usuário
-    roastResult.value = generatePersonalizedRoast(selectedTone.value, musicAnalysis.value)
+    // Usar IA para gerar roast personalizado
+    const aiRoast = await aiRoastService.generateRoast(selectedTone.value, musicAnalysis.value)
+    roastResult.value = aiRoast
   } catch (error) {
-    console.error('Error generating roast:', error)
-    roastResult.value = mockRoasts[selectedTone.value] // Fallback para mock
+    console.error('Error generating AI roast:', error)
+    // Fallback para roast personalizado baseado nos dados
+    roastResult.value = generatePersonalizedRoast(selectedTone.value, musicAnalysis.value)
   } finally {
-    isLoading.value = false
+    isGeneratingRoast.value = false
   }
 }
 
@@ -117,6 +127,7 @@ const disconnect = () => {
   selectedTone.value = 'leve'
   userData.value = null
   musicAnalysis.value = null
+  isGeneratingRoast.value = false
 }
 </script>
 
@@ -200,79 +211,92 @@ const disconnect = () => {
 
             <!-- Tone Selector -->
             <div class="mb-4">
-              <h5 class="text-white mb-3">Escolha o tom da crítica:</h5>
-              <b-form-radio-group
-                v-model="selectedTone"
-                class="tone-selector"
-              >
-                <b-row>
-                  <b-col 
-                    v-for="tone in toneOptions" 
-                    :key="tone.id"
-                    cols="12" 
-                    md="6"
-                    class="mb-3"
+              <h5 class="text-white mb-3">🎭 Escolha o estilo do seu julgamento:</h5>
+              <b-row class="g-3">
+                <b-col 
+                  v-for="tone in toneOptions" 
+                  :key="tone.id"
+                  cols="12" 
+                  sm="6"
+                  lg="4"
+                >
+                  <div 
+                    class="tone-option"
+                    :class="{ 'selected': selectedTone === tone.id }"
+                    @click="selectedTone = tone.id"
                   >
-                    <b-form-radio 
-                      :value="tone.id"
-                      class="tone-option"
-                    >
-                      <b-card 
-                        class="tone-card h-100"
-                        :class="selectedTone === tone.id ? 'selected' : ''"
-                        body-class="p-3"
-                      >
-                        <div class="d-flex align-items-center">
-                          <span class="tone-emoji me-3">{{ tone.emoji }}</span>
-                          <div>
-                            <div class="fw-bold text-white">{{ tone.label }}</div>
-                            <div class="small text-muted">{{ tone.description }}</div>
-                          </div>
-                        </div>
-                      </b-card>
-                    </b-form-radio>
-                  </b-col>
-                </b-row>
-              </b-form-radio-group>
+                    <div class="tone-content">
+                      <div class="tone-header">
+                        <span class="tone-emoji">{{ tone.emoji }}</span>
+                        <h6 class="tone-title">{{ tone.label }}</h6>
+                      </div>
+                      <p class="tone-description">{{ tone.description }}</p>
+                      <div class="tone-preview">
+                        <small class="text-muted">{{ tone.preview || 'Clique para selecionar' }}</small>
+                      </div>
+                    </div>
+                    <div class="selection-indicator">
+                      <i class="bi bi-check-circle-fill"></i>
+                    </div>
+                  </div>
+                </b-col>
+              </b-row>
             </div>
 
             <!-- Generate Button -->
             <b-button 
               @click="generateRoast"
-              :disabled="isLoading"
+              :disabled="isGeneratingRoast || isLoading"
               variant="danger"
               size="lg"
               class="w-100 mb-4 roast-button"
             >
-              <b-spinner v-if="isLoading" small class="me-2"></b-spinner>
-              {{ isLoading ? 'Analisando seu gosto musical...' : '🎯 Me julgue agora' }}
+              <b-spinner v-if="isGeneratingRoast || isLoading" small class="me-2"></b-spinner>
+              <span v-if="isGeneratingRoast">🤖 IA analisando seu gosto...</span>
+              <span v-else-if="isLoading">📊 Carregando dados...</span>
+              <span v-else>🎯 Me julgue com IA agora</span>
             </b-button>
 
             <!-- Roast Result -->
             <b-card v-if="roastResult" class="roast-result-card mb-3">
               <div class="d-flex align-items-start mb-3">
                 <div class="roast-icon me-3">
-                  <span class="fs-4">🔥</span>
+                  <span class="fs-4">🤖</span>
                 </div>
                 <div>
-                  <h6 class="fw-bold text-white mb-1">Seu Roast Musical</h6>
-                  <p class="small text-muted mb-0">Baseado no seu histórico do Spotify</p>
+                  <h6 class="fw-bold text-white mb-1">
+                    Roast Gerado por IA
+                    <b-badge variant="success" class="ms-2">{{ toneOptions.find(t => t.id === selectedTone)?.label }}</b-badge>
+                  </h6>
+                  <p class="small text-muted mb-0">Análise personalizada baseada nos seus dados do Spotify</p>
                 </div>
               </div>
               
-              <p class="text-light lead mb-4">
-                {{ roastResult }}
-              </p>
+              <div class="roast-content mb-4">
+                <p class="text-light lead mb-0">
+                  {{ roastResult }}
+                </p>
+              </div>
 
-              <b-button 
-                @click="shareRoast"
-                variant="primary"
-                size="lg"
-                class="w-100 share-button"
-              >
-                <i class="bi bi-share me-2"></i>
-                Compartilhar Roast
-              </b-button>
+              <div class="d-flex gap-2">
+                <b-button 
+                  @click="shareRoast"
+                  variant="primary"
+                  class="flex-fill share-button"
+                >
+                  <i class="bi bi-share me-2"></i>
+                  Compartilhar
+                </b-button>
+                <b-button 
+                  @click="generateRoast"
+                  variant="outline-secondary"
+                  :disabled="isGeneratingRoast"
+                  class="flex-fill"
+                >
+                  <i class="bi bi-arrow-clockwise me-2"></i>
+                  Gerar Novo
+                </b-button>
+              </div>
             </b-card>
           </div>
         </b-card>
@@ -330,30 +354,80 @@ const disconnect = () => {
   border: 1px solid #4b5563;
 }
 
-.tone-selector .form-check-input {
-  display: none;
-}
-
-.tone-card {
+.tone-option {
   background: rgba(75, 85, 99, 0.3);
   border: 2px solid #4b5563;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  height: 140px;
+  display: flex;
+  flex-direction: column;
 }
 
-.tone-card:hover {
+.tone-option:hover {
   border-color: #6b7280;
-  transform: scale(1.05);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
-.tone-card.selected {
+.tone-option.selected {
   border-color: #22c55e;
-  background: rgba(34, 197, 94, 0.1);
-  box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.3);
+}
+
+.tone-content {
+  padding: 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.tone-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
 }
 
 .tone-emoji {
-  font-size: 2rem;
+  font-size: 1.8rem;
+  margin-right: 0.5rem;
+}
+
+.tone-title {
+  color: white;
+  font-weight: bold;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.tone-description {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  flex: 1;
+}
+
+.tone-preview {
+  font-style: italic;
+  font-size: 0.75rem;
+}
+
+.selection-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: #22c55e;
+  font-size: 1.2rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tone-option.selected .selection-indicator {
+  opacity: 1;
 }
 
 .roast-button {
@@ -370,14 +444,22 @@ const disconnect = () => {
 }
 
 .roast-result-card {
-  background: linear-gradient(135deg, rgba(31, 41, 55, 0.8), rgba(55, 65, 81, 0.8));
+  background: linear-gradient(135deg, rgba(31, 41, 55, 0.9), rgba(55, 65, 81, 0.9));
   border: 1px solid #4b5563;
+  backdrop-filter: blur(10px);
+}
+
+.roast-content {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border-left: 4px solid #22c55e;
 }
 
 .roast-icon {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, #ef4444, #ec4899);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   border-radius: 50%;
   display: flex;
   align-items: center;

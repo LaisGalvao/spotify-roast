@@ -1,9 +1,39 @@
 export const toneOptions = [
-  { id: 'leve', emoji: '🧁', label: 'Leve', description: 'Crítica suave e divertida' },
-  { id: 'debochado', emoji: '💅', label: 'Debochado', description: 'Sarcasmo refinado' },
-  { id: 'quebrada', emoji: '💥', label: 'Mano da quebrada', description: 'Direto e sem papas na língua' },
-  { id: 'exposed', emoji: '🔥', label: 'Exposed emocional', description: 'Vai doer, mas é verdade' },
-  { id: 'poetico', emoji: '🌈', label: 'Poético existencial', description: 'Filosofia musical profunda' }
+  { 
+    id: 'leve', 
+    emoji: '🧁', 
+    label: 'Suave', 
+    description: 'Crítica carinhosa e divertida',
+    preview: '"Seu gosto é como playlist de café..."'
+  },
+  { 
+    id: 'debochado', 
+    emoji: '💅', 
+    label: 'Debochado', 
+    description: 'Sarcasmo refinado e elegante',
+    preview: '"Querido, até a IA ficou confusa..."'
+  },
+  { 
+    id: 'quebrada', 
+    emoji: '💥', 
+    label: 'Quebrada', 
+    description: 'Direto, sem papas na língua',
+    preview: '"Mano, relaxa na pose aí..."'
+  },
+  { 
+    id: 'exposed', 
+    emoji: '🔥', 
+    label: 'Exposed', 
+    description: 'Vai doer, mas é pura verdade',
+    preview: '"Sua playlist grita insegurança..."'
+  },
+  { 
+    id: 'poetico', 
+    emoji: '🌈', 
+    label: 'Poético', 
+    description: 'Filosofia musical profunda',
+    preview: '"Tua alma dança em frequências..."'
+  }
 ]
 
 export const mockRoasts = {
