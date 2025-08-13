@@ -66,22 +66,51 @@ class SpotifyService {
 
   // Gerar URL de autorização com PKCE
   async getAuthUrl() {
-    const codeVerifier = this.generateCodeVerifier()
-    const codeChallenge = await this.generateCodeChallenge(codeVerifier)
-    
-    // Salvar code verifier para usar na troca de token
-    localStorage.setItem('spotify_code_verifier', codeVerifier)
-    
-    const params = new URLSearchParams({
-      response_type: 'code',
-      client_id: SPOTIFY_CONFIG.CLIENT_ID,
-      scope: SPOTIFY_CONFIG.SCOPES.join(' '),
-      redirect_uri: SPOTIFY_CONFIG.REDIRECT_URI,
-      code_challenge_method: 'S256',
-      code_challenge: codeChallenge
-    })
+    try {
+      // Validar configurações
+      if (!SPOTIFY_CONFIG.CLIENT_ID || SPOTIFY_CONFIG.CLIENT_ID === 'your_spotify_client_id_here') {
+        throw new Error('SPOTIFY_CLIENT_ID não configurado no .env')
+      }
+      
+      if (!SPOTIFY_CONFIG.REDIRECT_URI) {
+        throw new Error('SPOTIFY_REDIRECT_URI não configurado no .env')
+      }
 
-    return `${SPOTIFY_CONFIG.AUTH_URL}?${params.toString()}`
+      const codeVerifier = this.generateCodeVerifier()
+      const codeChallenge = await this.generateCodeChallenge(codeVerifier)
+      
+      // Salvar code verifier para usar na troca de token
+      localStorage.setItem('spotify_code_verifier', codeVerifier)
+      
+      // Gerar um state único para segurança
+      const state = this.generateCodeVerifier().substring(0, 16)
+      localStorage.setItem('spotify_auth_state', state)
+      
+      const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: SPOTIFY_CONFIG.CLIENT_ID,
+        scope: SPOTIFY_CONFIG.SCOPES.join(' '),
+        redirect_uri: SPOTIFY_CONFIG.REDIRECT_URI,
+        code_challenge_method: 'S256',
+        code_challenge: codeChallenge,
+        state: state
+      })
+
+      const authUrl = `${SPOTIFY_CONFIG.AUTH_URL}?${params.toString()}`
+      
+      console.log('Auth URL params:', {
+        client_id: SPOTIFY_CONFIG.CLIENT_ID,
+        redirect_uri: SPOTIFY_CONFIG.REDIRECT_URI,
+        scopes: SPOTIFY_CONFIG.SCOPES.join(' '),
+        code_challenge: codeChallenge.substring(0, 10) + '...',
+        state: state
+      })
+      
+      return authUrl
+    } catch (error) {
+      console.error('Error generating auth URL:', error)
+      throw error
+    }
   }
 
   // Trocar código de autorização por token usando PKCE
@@ -91,6 +120,8 @@ class SpotifyService {
       if (!codeVerifier) {
         throw new Error('Code verifier not found')
       }
+
+      console.log('Exchanging code for token...', { code: code.substring(0, 20) + '...', codeVerifier: codeVerifier.substring(0, 10) + '...' })
 
       const response = await fetch('https://accounts.spotify.com/api/token', {
         method: 'POST',
@@ -106,13 +137,19 @@ class SpotifyService {
         })
       })
 
+      const data = await response.json()
+      console.log('Token exchange response:', { 
+        ok: response.ok, 
+        status: response.status,
+        hasAccessToken: !!data.access_token,
+        error: data.error 
+      })
+
       if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Token exchange error:', errorData)
-        throw new Error(`Failed to exchange code for token: ${errorData.error_description || errorData.error}`)
+        console.error('Token exchange error details:', data)
+        throw new Error(`Failed to exchange code for token: ${data.error_description || data.error}`)
       }
 
-      const data = await response.json()
       this.setTokens(data)
       
       // Limpar code verifier após uso
@@ -159,6 +196,12 @@ class SpotifyService {
 
   // Salvar tokens no localStorage
   setTokens(tokenData) {
+    console.log('Setting tokens:', { 
+      access_token: tokenData.access_token?.substring(0, 20) + '...',
+      refresh_token: !!tokenData.refresh_token,
+      expires_in: tokenData.expires_in 
+    })
+    
     this.accessToken = tokenData.access_token
     
     if (tokenData.refresh_token) {
@@ -172,6 +215,8 @@ class SpotifyService {
 
     localStorage.setItem('spotify_access_token', this.accessToken)
     localStorage.setItem('spotify_token_expiry', expiryTime.toString())
+    
+    console.log('Tokens set successfully, access token available:', !!this.accessToken)
   }
 
   // Verificar se está autenticado
@@ -190,12 +235,20 @@ class SpotifyService {
     localStorage.removeItem('spotify_refresh_token')
     localStorage.removeItem('spotify_token_expiry')
     localStorage.removeItem('spotify_code_verifier')
+    localStorage.removeItem('spotify_auth_state')
   }
 
   // Obter perfil do usuário
   async getUserProfile() {
-    const response = await this.api.get(SPOTIFY_ENDPOINTS.USER_PROFILE)
-    return response.data
+    try {
+      console.log('Getting user profile with token:', this.accessToken?.substring(0, 20) + '...')
+      const response = await this.api.get(SPOTIFY_ENDPOINTS.USER_PROFILE)
+      console.log('User profile response:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('Error getting user profile:', error.response?.data || error)
+      throw error
+    }
   }
 
   // Obter playlists do usuário

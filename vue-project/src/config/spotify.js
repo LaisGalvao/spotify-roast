@@ -17,8 +17,8 @@ export const SPOTIFY_CONFIG = {
 
 // URLs específicas da API
 export const SPOTIFY_ENDPOINTS = {
-  ME: '/me',
-  PLAYLISTS: '/me/playlists',
+  USER_PROFILE: '/me',
+  USER_PLAYLISTS: '/me/playlists',
   TOP_TRACKS: '/me/top/tracks',
   TOP_ARTISTS: '/me/top/artists',
   RECENTLY_PLAYED: '/me/player/recently-played',

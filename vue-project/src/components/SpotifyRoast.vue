@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { toneOptions } from '../data/roastData.js'
 import spotifyService from '../services/spotifyService.js'
 import aiRoastService from '../services/aiRoastService.js'
+import SpotifyDebug from './SpotifyDebug.vue'
 
 const isConnected = ref(false)
 const isLoading = ref(false)
@@ -307,6 +308,9 @@ const disconnect = () => {
             Feito com 💔 e muito sarcasmo • Não levem a sério, é só diversão!
           </p>
         </div>
+        
+        <!-- Debug Component (temporário) -->
+        <SpotifyDebug />
       </b-col>
     </b-row>
   </b-container>
