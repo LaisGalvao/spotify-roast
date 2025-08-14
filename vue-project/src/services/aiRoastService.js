@@ -1,3 +1,5 @@
+import openaiService from './openaiService.js'
+
 // Serviço de IA para geração de roasts musicais
 class AIRoastService {
   constructor() {
@@ -26,6 +28,14 @@ class AIRoastService {
         'techno': { mainstream: 0.3, energy: 1.0, emotional: 0.2 }
       }
     }
+    this.openaiAvailable = null
+  }
+
+  async checkOpenAIAvailability() {
+    if (this.openaiAvailable === null) {
+      this.openaiAvailable = await openaiService.isAvailable()
+    }
+    return this.openaiAvailable
   }
 
   // Analisar perfil psicológico baseado em dados musicais
@@ -200,8 +210,6 @@ class AIRoastService {
         }
       ]
     }
-
-    return templates[tone] || templates.leve
   }
 
   // Selecionar template baseado na personalidade
@@ -232,16 +240,64 @@ class AIRoastService {
 
   // Método principal para gerar roast
   async generateRoast(tone, musicData) {
-    // Simular processamento de IA
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
     try {
-      return this.generateIntelligentRoast(tone, musicData)
+      // Tenta usar OpenAI primeiro
+      const isOpenAIAvailable = await this.checkOpenAIAvailability()
+      
+      if (isOpenAIAvailable) {
+        console.log('🤖 Usando OpenAI para gerar roast...')
+        const openaiRoast = await openaiService.generateRoast(tone, musicData)
+        return {
+          text: openaiRoast,
+          source: 'openai',
+          tone: tone
+        }
+      }
     } catch (error) {
-      console.error('Error generating AI roast:', error)
-      // Fallback para templates simples
-      return this.generateFallbackRoast(tone, musicData)
+      console.warn('OpenAI falhou, usando sistema local:', error.message)
     }
+
+    // Fallback para sistema local
+    console.log('🔧 Usando sistema local para gerar roast...')
+    const localRoast = this.generateLocalRoast(tone, musicData)
+    return {
+      text: localRoast,
+      source: 'local',
+      tone: tone
+    }
+  }
+
+  // Mantém o sistema local como fallback (código existente)
+  generateLocalRoast(tone, musicData) {
+    const { topGenres, topArtists, audioFeatures, profile } = musicData
+
+    const templates = {
+      'leve': [
+        `${profile?.display_name || 'Você'} ouvindo ${topGenres?.[0] || 'suas músicas'} é como tentar parecer cool mas acabar sendo fofo 🥺`,
+        `Seu Spotify Wrapped deve ser uma mistura interessante de ${topArtists?.[0]?.name || 'artista aleatório'} e vergonha alheia 😅`
+      ],
+      'debochado': [
+        `Ah sim, ${topGenres?.[0] || 'seu gênero musical'}, a escolha de quem quer ser diferente igual todo mundo 🙄`,
+        `${topArtists?.[0]?.name || 'Seu artista favorito'} deve estar muito orgulhoso de ter um fã tão... eclético 💅`
+      ],
+      'quebrada': [
+        `Mano, teu gosto musical é tipo cafezinho de padaria: todo mundo toma, mas ninguém admite que gosta 💀`,
+        `${topGenres?.[0] || 'Tua playlist'} é a prova de que algoritmo do Spotify às vezes falha mesmo 🔥`
+      ],
+      'exposed': [
+        `Seu ${topGenres?.[0] || 'gênero favorito'} revela uma necessidade profunda de validação social disfarçada de rebeldia 🔍`,
+        `A energia de ${Math.round((audioFeatures?.energy || 0.5) * 100)}% nas suas músicas espelha perfeitamente sua personalidade: nem muito, nem pouco, só na média mesmo 📊`
+      ],
+      'poetico': [
+        `Suas canções de ${topGenres?.[0] || 'gosto duvidoso'} são como folhas de outono: bonitas à distância, mas quando você pisa, fazem barulho demais 🍂`,
+        `Em um universo de possibilidades musicais infinitas, você escolheu ${topArtists?.[0]?.name || 'isso'}. Que corajoso... ou trágico? 🌌`
+      ]
+    }
+
+    const toneTemplates = templates[tone] || templates['leve']
+    const randomTemplate = toneTemplates[Math.floor(Math.random() * toneTemplates.length)]
+    
+    return randomTemplate
   }
 
   // Fallback simples caso a IA falhe
@@ -257,6 +313,38 @@ class AIRoastService {
     }
     
     return fallbacks[tone] || fallbacks.leve
+  }
+
+  // Mantém métodos existentes para compatibilidade
+  analyzeUserPersonality(musicData) {
+    const { topGenres, audioFeatures } = musicData
+    
+    const personality = {
+      mainstream: 0.5,
+      energy: audioFeatures?.energy || 0.5,
+      diversity: topGenres?.length || 1,
+      emotional: audioFeatures?.valence || 0.5
+    }
+    
+    return personality
+  }
+
+  getPersonalityInsights(personality) {
+    const insights = []
+    
+    if (personality.mainstream > 0.7) {
+      insights.push("Você segue as tendências musicais como um algoritmo do TikTok")
+    }
+    
+    if (personality.energy > 0.8) {
+      insights.push("Sua playlist tem mais energia que uma criança que tomou Red Bull")
+    }
+    
+    if (personality.diversity < 3) {
+      insights.push("Sua diversidade musical é menor que cardápio de boteco de esquina")
+    }
+    
+    return insights
   }
 }
 
